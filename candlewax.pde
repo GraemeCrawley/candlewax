@@ -20,8 +20,17 @@ class WaxDroplet {
   float coeff_fric;
   float temperature;
   WaxDroplet previous;
+  float delay;
+  
+  
+  // A PShape that will group PShapes
+  PShape group = createShape(GROUP);
+  PShape streamGroup = createShape(GROUP);
+  PShape circle;
+  PShape triangle;
+  float scale_mass;
 
-  WaxDroplet(float m, float x, float y) {
+  WaxDroplet(float m, float x, float y, float d) {
     mass = m;
     coeff_fric = 0.08;
     position = new PVector(x, y);
@@ -29,6 +38,13 @@ class WaxDroplet {
     acceleration = new PVector(0, 0);
     temperature = 100;
     previous = null;
+    delay = d;
+    
+    circle = createShape(ELLIPSE, 0, 0, radius, radius);
+    triangle = createShape(TRIANGLE, -2.3, 0, 2.3, 0, 0, -7);
+    group.addChild(circle);
+    group.addChild(triangle);
+    scale_mass = scale_factor*mass;
   }
 
   // Newton's 2nd law: F = M * A
@@ -39,50 +55,56 @@ class WaxDroplet {
     // Accumulate all forces in acceleration
     acceleration.add(f);
   }
+  
+  void update(){
+    if (delay < 0){
+      update_shape();
+    } else {
+      delay = delay - 0.05;
+    }
+  }
 
-  void update() {
+  void update_shape() {
     // Velocity changes according to acceleration
     velocity.add(acceleration);
     // Leave some of the mass behind
     if (mass > 0.05 && velocity.y > 0 && temperature > 0) {
       leftover = velocity.y * 0.001;
       mass = mass - leftover * mass;
-      temperature = temperature - mass*0.9/temperature*0.6;
+      temperature = temperature - 0.01;
       // position changes by velocity
       position.add(velocity);
       
     }
     // We must clear acceleration each frame
     acceleration.mult(0);
-    //println("Mass: " + mass);
-    //println("Temp: " + temperature);
-    //println("Acceleration: " + acceleration);
-    //println("Velocity: " + velocity);
-    //println("Position: " + position);
+    println("Mass: " + mass);
+    println("Temp: " + temperature);
+    println("Acceleration: " + acceleration);
+    println("Velocity: " + velocity);
+    println("Position: " + position);
     
-    WaxDroplet w = new WaxDroplet(mass*0.8, position.x, position.y);
+    scale_mass = scale_factor*mass;
     
-    if (previous == null){
-      previous = w;
-    } else {
-      w.previous = previous;
-      previous = w;
-    }
+    PShape circle = createShape(ELLIPSE, position.x, position.y, radius*scale_mass*0.9, radius*scale_mass*0.9);
+    streamGroup.addChild(circle);    
+    shape(streamGroup);
+    
   }
 
   // Draw Mover
   void display() {
-    stroke(100, 50, 255);
-    strokeWeight(2);
-    fill(100, 50, 255);
-    ellipse(position.x, position.y, mass*10, mass*10);
-    triangle(position.x - mass*5, position.y, position.x + mass*5, position.y, position.x, position.y - mass*40);
-    if (previous != null){
-      previous.display();
-    }
+    pushMatrix();
+    translate(position.x, position.y);
+    scale(scale_mass);
+    group.setStrokeWeight(2);
+    shape(group);
+    popMatrix();
+    
+    
   }
 
-  // Bounce off bottom of window
+  // Stop at bottom of window
   void checkEdges() {
     if (position.y -10 > height) {
       velocity.y *= -0.9;  // A little dampening when hitting the bottom
@@ -100,25 +122,38 @@ class WaxDroplet {
  * resistance when in "water".
  */
 
-// Five moving bodies
-int num_drops = 40;
+// moving bodies
+int num_drops = 30;
 WaxDroplet[] wax_droplets = new WaxDroplet[num_drops];
 
+int r = 100;
+int g = 50;
+int b = 255;
+
+float mass_min = 0.5;
+float mass_max = 4;
+float radius = 5;
+float scale_factor = 3;
+color c = color(50, 50, 255);
+
+
 void setup() {
-  size(800, 800);
+  shapeMode(CENTER);
+  noStroke();
+  fill(c);
   background(0);
+  size(600, 800);
   reset();
 }
 
 void draw() {
   background(0);
-
   //println(wax_droplets.length);
   for (WaxDroplet wax_droplet : wax_droplets) {
 
     // Gravity is scaled by mass here!
-    PVector gravity = new PVector(0, 0.01*wax_droplet.mass);
-    float viscosity = 0.09*wax_droplet.temperature/(wax_droplet.mass*150);
+    PVector gravity = new PVector(0, 0.005*wax_droplet.mass);
+    float viscosity = 0.2*wax_droplet.temperature/(wax_droplet.mass*80);
     PVector friction = new PVector(0, -1 * (wax_droplet.coeff_fric*viscosity));
     //println("Friction: " + friction);
     //println("Gravity: " + gravity);
@@ -131,8 +166,6 @@ void draw() {
     wax_droplet.display();
     wax_droplet.checkEdges();
   }
-  
-  fill(255);
   text("click mouse to reset", 10, 30);
 }
 
@@ -145,6 +178,6 @@ void reset() {
   background(0);
   for (int i = 0; i < wax_droplets.length; i++) {
     float channel_width = width/num_drops;
-    wax_droplets[i] = new WaxDroplet(random(0.5, 4), random(i*channel_width, channel_width*i+channel_width), -10);
+    wax_droplets[i] = new WaxDroplet(random(mass_min, mass_max), random(i*channel_width, channel_width*i+channel_width), -30, random(0,20));
   }
 }
